@@ -29,7 +29,7 @@ jobs:
           --name twitch2vrc
           --hidden-import twitchio
           --hidden-import twitchio.ext.commands
-          twitch_vrc.py
+          twitch2vrc.py
 
       - name: Upload exe to release
         uses: softprops/action-gh-release@v2
