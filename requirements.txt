@@ -1,0 +1,3 @@
+twitchio<3
+python-osc
+pyinstaller
