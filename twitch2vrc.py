@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import time
+import webbrowser
 from pythonosc import udp_client
 from twitchio.ext import commands
 
@@ -15,6 +16,7 @@ DEFAULT_BLOCKED_BOTS = [
     "Pokemoncommunitygame",
 ]
 DEFAULT_BLOCKED_PREFIXES = ["!"]
+TOKEN_GENERATOR_URL = "https://twitchtokengenerator.com/quick/a9IivPUewe"
 
 
 def _config_path() -> str:
@@ -28,11 +30,13 @@ def _config_path() -> str:
 
 def load_config() -> tuple[str, str, set[str], tuple[str, ...]]:
     path = _config_path()
+    needs_token_help = True
     if os.path.exists(path):
         with open(path) as f:
             cfg = json.load(f)
         token = cfg.get("twitch_token", "")
         channel = cfg.get("twitch_channel", "")
+        needs_token_help = not bool(token)
         blocked_users = cfg.get("blocked_users", DEFAULT_BLOCKED_BOTS)
         blocked_prefixes = cfg.get(
             "blocked_prefixes", DEFAULT_BLOCKED_PREFIXES
@@ -61,8 +65,18 @@ def load_config() -> tuple[str, str, set[str], tuple[str, ...]]:
             return token, channel, blocked, prefixes
         print("config.json is incomplete — please re-enter your details.\n")
 
+    if needs_token_help:
+        try:
+            webbrowser.open(TOKEN_GENERATOR_URL, new=2)
+            print(
+                "Opened token generator in your browser: "
+                f"{TOKEN_GENERATOR_URL}"
+            )
+        except Exception:
+            print("Could not open your browser automatically.")
+
     print("── First-run setup ──────────────────────────────────────────────")
-    print("Generate a token at https://twitchtokengenerator.com")
+    print(f"Generate a token at {TOKEN_GENERATOR_URL}")
     print("Required scope: chat:read\n")
     token = input(
         "Paste your access token: "
