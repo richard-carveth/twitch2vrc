@@ -253,11 +253,15 @@ manager = DisplayManager()
 async def display_loop() -> None:
     last_sent: str | None = None
     last_sent_time: float = 0.0
+    pending: str | None = None
 
     while True:
         result = manager.update()
 
-        if result is not None and result != last_sent:
+        if result is None and result != last_sent:
+            pending = result
+
+        if result is not None and pending != last_sent:
             now = time.monotonic()
             if now - last_sent_time >= T_OSC_RATE_LIMIT:
                 send_chatbox(result)
@@ -267,6 +271,7 @@ async def display_loop() -> None:
                     print(f"[ChatBox]\n{result}\n{'─' * 40}")
                 else:
                     print("[ChatBox] <cleared>")
+
         await asyncio.sleep(T_REFRESH)
 
 
