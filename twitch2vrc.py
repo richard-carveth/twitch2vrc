@@ -32,13 +32,11 @@ def _config_path() -> str:
 
 def load_config() -> tuple[str, str, set[str], tuple[str, ...], str, int]:
     path = _config_path()
-    needs_token_help = True
     if os.path.exists(path):
         with open(path) as f:
             cfg = json.load(f)
         token = cfg.get("twitch_token", "")
         channel = cfg.get("twitch_channel", "")
-        needs_token_help = not bool(token)
         blocked_users = cfg.get("blocked_users", DEFAULT_BLOCKED_BOTS)
         blocked_prefixes = cfg.get(
             "blocked_prefixes", DEFAULT_BLOCKED_PREFIXES
@@ -82,7 +80,7 @@ def load_config() -> tuple[str, str, set[str], tuple[str, ...], str, int]:
             )
         print("config.json is incomplete — please re-enter your details.\n")
 
-    if needs_token_help:
+    if not token:
         try:
             webbrowser.open(TOKEN_GENERATOR_URL, new=2)
             print(
@@ -218,13 +216,14 @@ class DisplayItem:
 
 
 class DisplayManager:
+    MAX_QUEUE_SIZE = 25
+
     def __init__(self) -> None:
         self.queue:  list[DisplayItem] = []
         self.active: list[DisplayItem] = []
-        self.max_queue_size = 25
 
     def enqueue(self, username: str, message: str) -> None:
-        if len(self.queue) >= self.max_queue_size:
+        if len(self.queue) >= self.MAX_QUEUE_SIZE:
             self.queue.pop(0)
         full = f"{username}: {message}"
         if len(full) <= MAX_CHARS:
@@ -240,34 +239,26 @@ class DisplayManager:
     def _fits(self, candidate: DisplayItem) -> bool:
         return len(self._render(self.active + [candidate])) <= MAX_CHARS
 
+    def _try_advance(self) -> bool:
+        if self.queue and self._fits(self.queue[0]):
+            item = self.queue.pop(0)
+            item.mark_shown()
+            self.active.append(item)
+            return True
+        if self.active and self.active[0].eligible_for_removal:
+            self.active.pop(0)
+            return True
+        return False
+
     def update(self) -> str | None:
         for item in self.active:
             item.mark_shown()
-
         if not self.queue:
             return None
-
         changed = False
-        progress = True
-
-        while progress and self.queue:
-            progress = False
-
-            if self._fits(self.queue[0]):
-                item = self.queue.pop(0)
-                item.mark_shown()
-                self.active.append(item)
-                changed = True
-                progress = True
-
-            elif self.active and self.active[0].eligible_for_removal:
-                self.active.pop(0)
-                changed = True
-                progress = True
-
-        if changed:
-            return self._render(self.active) if self.active else ""
-        return None
+        while self._try_advance():
+            changed = True
+        return self._render(self.active) if changed else None
 
 
 manager = DisplayManager()
@@ -287,11 +278,11 @@ async def display_loop() -> None:
         if pending is not None and pending != last_sent:
             now = time.monotonic()
             if now - last_sent_time >= T_OSC_RATE_LIMIT:
-                send_chatbox(result)
-                last_sent = result
+                send_chatbox(pending)
+                last_sent = pending
                 last_sent_time = now
-                if result:
-                    print(f"[ChatBox]\n{result}\n{'─' * 40}")
+                if pending:
+                    print(f"[ChatBox]\n{pending}\n{'─' * 40}")
                 else:
                     print("[ChatBox] <cleared>")
 
